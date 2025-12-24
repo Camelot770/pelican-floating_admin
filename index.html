@@ -1322,36 +1322,74 @@
                 
                 console.log('📥 Response status:', response.status);
                 const result = await response.json();
-                console.log('📥 Response data:', result);
+                console.log('📥 Response data:', JSON.stringify(result, null, 2));
                 
-                if (response.ok && result && result.redeem_code) {
-                    showModal(`
-                        <div class="modal-title">✅ Сертификат оплачен!</div>
-                        <div style="text-align: center; margin: 20px 0;">
-                            <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">Код отправлен клиенту</div>
-                            <div style="background: rgba(0,255,136,0.1); border-radius: 16px; padding: 20px; margin: 16px 0;">
-                                <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">КОД АКТИВАЦИИ</div>
-                                <div style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: var(--accent-green); font-family: monospace;">
-                                    ${result.redeem_code}
+                if (response.ok && result) {
+                    if (result.redeem_code) {
+                        const telegramStatus = result.telegram_sent 
+                            ? '✅ Сообщение отправлено покупателю' 
+                            : `⚠️ Сообщение не отправлено: ${result.telegram_error || 'неизвестная ошибка'}`;
+                        
+                        showModal(`
+                            <div class="modal-title">✅ Сертификат оплачен!</div>
+                            <div style="text-align: center; margin: 20px 0;">
+                                <div style="background: rgba(0,255,136,0.1); border-radius: 16px; padding: 20px; margin: 16px 0;">
+                                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">КОД АКТИВАЦИИ</div>
+                                    <div style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: var(--accent-green); font-family: monospace;">
+                                        ${result.redeem_code}
+                                    </div>
+                                </div>
+                                <div style="font-size: 13px; color: var(--text-secondary);">
+                                    ${result.cert_name || ''} · ${(result.price || 0).toLocaleString()} ₽
+                                </div>
+                                <div style="font-size: 12px; margin-top: 12px; padding: 8px; border-radius: 8px; background: ${result.telegram_sent ? 'rgba(0,255,136,0.1)' : 'rgba(255,100,100,0.1)'};">
+                                    ${telegramStatus}
                                 </div>
                             </div>
-                            <div style="font-size: 13px; color: var(--text-secondary);">
-                                ${result.cert_name || ''} · ${(result.price || 0).toLocaleString()} ₽
+                            <div class="modal-actions">
+                                <button class="btn btn-primary" onclick="closeModal()">Готово</button>
                             </div>
+                        `);
+                        showToast('✅ Код: ' + result.redeem_code, 'success');
+                    } else {
+                        console.error('❌ No redeem_code in response:', result);
+                        showModal(`
+                            <div class="modal-title">⚠️ Внимание</div>
+                            <div style="text-align: center; margin: 20px 0;">
+                                <div style="color: var(--text-secondary);">
+                                    Сертификат обработан, но код не получен.<br>
+                                    Ответ сервера: ${JSON.stringify(result)}
+                                </div>
+                            </div>
+                            <div class="modal-actions">
+                                <button class="btn btn-primary" onclick="closeModal()">OK</button>
+                            </div>
+                        `);
+                    }
+                } else {
+                    const errorMsg = result?.detail || result?.error || JSON.stringify(result);
+                    console.error('❌ Error response:', errorMsg);
+                    showModal(`
+                        <div class="modal-title">❌ Ошибка</div>
+                        <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
+                            ${errorMsg}
                         </div>
                         <div class="modal-actions">
-                            <button class="btn btn-primary" onclick="closeModal()">Готово</button>
+                            <button class="btn btn-primary" onclick="closeModal()">OK</button>
                         </div>
                     `);
-                    showToast('✅ Сертификат подтверждён!', 'success');
-                } else {
-                    const errorMsg = result?.detail || result?.error || 'Неизвестная ошибка';
-                    console.error('❌ Error:', errorMsg);
-                    showToast('❌ Ошибка: ' + errorMsg, 'error');
                 }
             } catch (e) {
                 console.error('❌ Exception:', e);
-                showToast('❌ Ошибка сети: ' + e.message, 'error');
+                showModal(`
+                    <div class="modal-title">❌ Ошибка сети</div>
+                    <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
+                        ${e.message}
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-primary" onclick="closeModal()">OK</button>
+                    </div>
+                `);
             }
             
             loadCerts();
