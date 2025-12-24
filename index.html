@@ -909,6 +909,20 @@
             loadClients();
             loadSettings();
             loadSubscribersCount();
+            
+            // Делаем функции глобальными для onclick
+            window.markCertPaid = markCertPaid;
+            window.callClient = callClient;
+            window.copyToClipboard = copyToClipboard;
+            window.useCertByCode = useCertByCode;
+            window.useCert = useCert;
+            window.closeModal = closeModal;
+            window.showClientDetails = showClientDetails;
+            window.cancelBooking = cancelBooking;
+            window.filterCerts = filterCerts;
+            window.checkCertCode = checkCertCode;
+            
+            console.log('✅ All functions registered globally');
         });
         
         function updateTodayDate() {
@@ -1162,7 +1176,49 @@
         }
         
         function callClient(phone) {
-            if (phone) window.location.href = `tel:${phone}`;
+            if (!phone) {
+                showToast('Номер телефона не указан', 'error');
+                return;
+            }
+            
+            // Очищаем номер от пробелов и дефисов
+            const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+            
+            console.log('📞 Calling:', cleanPhone);
+            
+            // Показываем модал с номером и кнопками
+            showModal(`
+                <div class="modal-title">📞 Позвонить клиенту</div>
+                <div style="text-align: center; margin: 20px 0;">
+                    <div style="font-size: 24px; font-weight: 600; margin: 16px 0; color: var(--accent-cyan);">
+                        ${phone}
+                    </div>
+                </div>
+                <div class="modal-actions" style="flex-direction: column; gap: 10px;">
+                    <a href="tel:${cleanPhone}" class="btn btn-primary" style="text-decoration: none; display: block; text-align: center;">
+                        📞 Позвонить
+                    </a>
+                    <button class="btn btn-secondary" onclick="copyToClipboard('${cleanPhone}')">
+                        📋 Скопировать номер
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
+                </div>
+            `);
+        }
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('✅ Номер скопирован', 'success');
+            }).catch(() => {
+                // Fallback
+                const input = document.createElement('input');
+                input.value = text;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showToast('✅ Номер скопирован', 'success');
+            });
         }
         
         // ============== CERTIFICATES ==============
@@ -1236,7 +1292,7 @@
                     </div>
                     ${c.status === 'pending' ? `
                         <div class="booking-actions">
-                            <button class="btn btn-small btn-success" onclick="markCertPaid('${c.id}')">✅ Подтвердить оплату</button>
+                            <button class="btn btn-small btn-success" onclick="console.log('Button clicked for:', '${c.id}'); markCertPaid('${c.id}')">✅ Подтвердить оплату</button>
                             <button class="btn btn-small btn-secondary" onclick="callClient('${c.buyer_phone}')">📞</button>
                         </div>
                     ` : ''}
@@ -1255,27 +1311,49 @@
         }
         
         async function markCertPaid(certId) {
-            const result = await apiCall(`/api/admin/certificates/${certId}/paid`, { method: 'POST' });
-            if (result && result.redeem_code) {
-                showModal(`
-                    <div class="modal-title">✅ Сертификат оплачен!</div>
-                    <div style="text-align: center; margin: 20px 0;">
-                        <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">Код отправлен клиенту</div>
-                        <div style="background: rgba(0,255,136,0.1); border-radius: 16px; padding: 20px; margin: 16px 0;">
-                            <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">КОД АКТИВАЦИИ</div>
-                            <div style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: var(--accent-green); font-family: monospace;">
-                                ${result.redeem_code}
+            console.log('🔄 markCertPaid called for:', certId);
+            showToast('⏳ Подтверждаем оплату...', 'info');
+            
+            try {
+                const response = await fetch(`${API_URL}/api/admin/certificates/${certId}/paid`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                console.log('📥 Response status:', response.status);
+                const result = await response.json();
+                console.log('📥 Response data:', result);
+                
+                if (response.ok && result && result.redeem_code) {
+                    showModal(`
+                        <div class="modal-title">✅ Сертификат оплачен!</div>
+                        <div style="text-align: center; margin: 20px 0;">
+                            <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">Код отправлен клиенту</div>
+                            <div style="background: rgba(0,255,136,0.1); border-radius: 16px; padding: 20px; margin: 16px 0;">
+                                <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">КОД АКТИВАЦИИ</div>
+                                <div style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: var(--accent-green); font-family: monospace;">
+                                    ${result.redeem_code}
+                                </div>
+                            </div>
+                            <div style="font-size: 13px; color: var(--text-secondary);">
+                                ${result.cert_name || ''} · ${(result.price || 0).toLocaleString()} ₽
                             </div>
                         </div>
-                        <div style="font-size: 13px; color: var(--text-secondary);">
-                            ${result.cert_name} · ${result.price?.toLocaleString()} ₽
+                        <div class="modal-actions">
+                            <button class="btn btn-primary" onclick="closeModal()">Готово</button>
                         </div>
-                    </div>
-                    <div class="modal-actions">
-                        <button class="btn btn-primary" onclick="closeModal()">Готово</button>
-                    </div>
-                `);
+                    `);
+                    showToast('✅ Сертификат подтверждён!', 'success');
+                } else {
+                    const errorMsg = result?.detail || result?.error || 'Неизвестная ошибка';
+                    console.error('❌ Error:', errorMsg);
+                    showToast('❌ Ошибка: ' + errorMsg, 'error');
+                }
+            } catch (e) {
+                console.error('❌ Exception:', e);
+                showToast('❌ Ошибка сети: ' + e.message, 'error');
             }
+            
             loadCerts();
             loadStats();
         }
