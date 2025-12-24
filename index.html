@@ -758,10 +758,11 @@
                     <input type="text" 
                            id="certCodeInput" 
                            class="input-field" 
-                           placeholder="XXXXXXXX" 
-                           style="text-transform: uppercase; text-align: center; font-size: 18px; letter-spacing: 2px; font-weight: 600;"
-                           maxlength="8"
-                           oninput="this.value = this.value.toUpperCase()">
+                           placeholder="12345" 
+                           style="text-align: center; font-size: 24px; letter-spacing: 4px; font-weight: 600;"
+                           maxlength="5"
+                           inputmode="numeric"
+                           pattern="[0-9]*">
                     <button class="btn btn-primary" onclick="checkCertCode()" style="white-space: nowrap;">
                         Проверить
                     </button>
@@ -790,6 +791,16 @@
                     <button class="btn btn-primary" style="flex: 1;" onclick="showAddPromoModal('promo')">🔥 Добавить акцию</button>
                     <button class="btn btn-secondary" style="flex: 1;" onclick="showAddPromoModal('news')">📰 Новость</button>
                 </div>
+            </div>
+            
+            <!-- Рассылка -->
+            <div class="card" style="background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(168,85,247,0.1)); margin-bottom: 16px;">
+                <div style="text-align: center; margin-bottom: 12px;">
+                    <span style="font-size: 32px;">📢</span>
+                    <div style="font-weight: 600; margin-top: 8px;">Рассылка сообщений</div>
+                    <div style="color: var(--text-secondary); font-size: 13px;" id="subscribersCount">Загрузка...</div>
+                </div>
+                <button class="btn btn-primary" style="width: 100%;" onclick="showBroadcastModal()">📤 Отправить рассылку</button>
             </div>
             
             <div class="section-title">📋 Активные акции и новости</div>
@@ -909,6 +920,11 @@
             
             document.getElementById(tabId + 'Tab').classList.add('active');
             event.currentTarget.classList.add('active');
+            
+            // Загружаем количество подписчиков при переходе на вкладку акций
+            if (tabId === 'promos') {
+                loadSubscribersCount();
+            }
             
             haptic('light');
         }
@@ -1261,9 +1277,9 @@
         }
         
         async function checkCertCode() {
-            const code = document.getElementById('certCodeInput').value.trim().toUpperCase();
-            if (!code || code.length < 6) {
-                showToast('Введите код сертификата', 'error');
+            const code = document.getElementById('certCodeInput').value.trim();
+            if (!code || code.length < 5) {
+                showToast('Введите 5-значный код сертификата', 'error');
                 return;
             }
             
@@ -1598,6 +1614,143 @@
             if (e.target.id === 'modal') closeModal();
         });
         
+        // ============== BROADCAST ==============
+        async function loadSubscribersCount() {
+            try {
+                const response = await fetch(`${API_URL}/api/subscribers`);
+                const data = await response.json();
+                document.getElementById('subscribersCount').textContent = 
+                    `Подписчиков: ${data.subscribed} из ${data.total_clients}`;
+            } catch (e) {
+                document.getElementById('subscribersCount').textContent = 'Ошибка загрузки';
+            }
+        }
+        
+        function showBroadcastModal() {
+            loadSubscribersCount();
+            
+            showModal(`
+                <div class="modal-title">📢 Рассылка сообщений</div>
+                <div style="margin-bottom: 16px;">
+                    <div id="broadcastSubscribersInfo" style="text-align: center; padding: 12px; background: rgba(99,102,241,0.1); border-radius: 12px; margin-bottom: 16px;">
+                        <div style="font-size: 24px; font-weight: 700; color: var(--accent-cyan);" id="modalSubscribersCount">—</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">подписчиков получат сообщение</div>
+                    </div>
+                    
+                    <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 13px;">Текст сообщения</label>
+                    <textarea id="broadcastText" class="input" rows="5" placeholder="Введите текст рассылки...&#10;Поддерживается *жирный* и _курсив_" style="width: 100%; resize: none;"></textarea>
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Поддерживается Markdown: *жирный*, _курсив_</div>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal()">Отмена</button>
+                    <button class="btn btn-primary" style="flex: 1;" onclick="previewBroadcast()">Далее →</button>
+                </div>
+            `);
+            
+            // Загружаем количество подписчиков
+            fetch(`${API_URL}/api/subscribers`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('modalSubscribersCount').textContent = data.subscribed;
+                })
+                .catch(() => {});
+        }
+        
+        function previewBroadcast() {
+            const text = document.getElementById('broadcastText').value.trim();
+            
+            if (!text) {
+                showToast('Введите текст сообщения', 'error');
+                return;
+            }
+            
+            showModal(`
+                <div class="modal-title">📝 Проверьте сообщение</div>
+                <div style="margin-bottom: 16px;">
+                    <div style="background: var(--bg-secondary); border-radius: 12px; padding: 16px; border-left: 4px solid var(--accent-cyan);">
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">🦩 Флоат студия Pelican</div>
+                        <div style="white-space: pre-wrap; line-height: 1.5;">${escapeHtml(text)}</div>
+                    </div>
+                    
+                    <div style="margin-top: 16px; padding: 12px; background: rgba(245,158,11,0.1); border-radius: 12px; text-align: center;">
+                        <div style="color: var(--accent-orange); font-weight: 500;">⚠️ Сообщение будет отправлено всем подписчикам</div>
+                        <div style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">Это действие нельзя отменить</div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" style="flex: 1;" onclick="showBroadcastModal()">← Назад</button>
+                    <button class="btn btn-primary" style="flex: 1;" onclick="sendBroadcast('${encodeURIComponent(text)}')">📤 Отправить</button>
+                </div>
+            `);
+        }
+        
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+        
+        async function sendBroadcast(encodedText) {
+            const text = decodeURIComponent(encodedText);
+            
+            showModal(`
+                <div style="text-align: center; padding: 40px;">
+                    <div style="font-size: 48px; animation: pulse 1s infinite;">📤</div>
+                    <div style="margin-top: 16px; font-weight: 600;">Отправка рассылки...</div>
+                    <div style="color: var(--text-secondary); font-size: 13px;">Пожалуйста, подождите</div>
+                </div>
+            `);
+            
+            try {
+                const response = await fetch(`${API_URL}/api/admin/broadcast`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showModal(`
+                        <div style="text-align: center; padding: 20px;">
+                            <div style="font-size: 64px; margin-bottom: 16px;">✅</div>
+                            <div style="font-size: 18px; font-weight: 600; margin-bottom: 12px;">Рассылка завершена!</div>
+                            <div style="display: flex; justify-content: center; gap: 24px; margin-bottom: 20px;">
+                                <div>
+                                    <div style="font-size: 28px; font-weight: 700; color: var(--accent-green);">${result.sent}</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary);">отправлено</div>
+                                </div>
+                                ${result.failed > 0 ? `
+                                    <div>
+                                        <div style="font-size: 28px; font-weight: 700; color: var(--accent-red);">${result.failed}</div>
+                                        <div style="font-size: 12px; color: var(--text-secondary);">ошибок</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <button class="btn btn-primary" onclick="closeModal()">Готово</button>
+                        </div>
+                    `);
+                } else {
+                    throw new Error('Broadcast failed');
+                }
+            } catch (error) {
+                console.error('Broadcast error:', error);
+                showModal(`
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 64px; margin-bottom: 16px;">❌</div>
+                        <div style="font-size: 18px; font-weight: 600; margin-bottom: 12px;">Ошибка рассылки</div>
+                        <div style="color: var(--text-secondary); margin-bottom: 20px;">Попробуйте ещё раз</div>
+                        <button class="btn btn-primary" onclick="closeModal()">Закрыть</button>
+                    </div>
+                `);
+            }
+        }
+        
         // ============== PROMOTIONS ==============
         async function loadPromos() {
             try {
@@ -1706,18 +1859,26 @@
             }
             
             try {
+                console.log('Creating promo:', { title, description, promo_type: type });
+                
                 const response = await fetch(`${API_URL}/api/admin/promotions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ title, description, promo_type: type })
                 });
                 
+                console.log('Response status:', response.status);
+                
                 if (response.ok) {
+                    const data = await response.json();
+                    console.log('Created:', data);
                     showToast('✅ ' + (type === 'promo' ? 'Акция' : 'Новость') + ' добавлена');
                     closeModal();
                     loadPromos();
                 } else {
-                    showToast('Ошибка создания', 'error');
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('Error response:', errorData);
+                    showToast('Ошибка: ' + (errorData.detail || response.statusText), 'error');
                 }
             } catch (error) {
                 console.error('Failed to create promo:', error);
