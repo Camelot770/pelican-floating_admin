@@ -716,6 +716,10 @@
             <span class="nav-tab-icon">🎁</span>
             <span>Серт-ты</span>
         </button>
+        <button class="nav-tab" onclick="switchTab('promos')">
+            <span class="nav-tab-icon">🔥</span>
+            <span>Акции</span>
+        </button>
         <button class="nav-tab" onclick="switchTab('clients')">
             <span class="nav-tab-icon">👥</span>
             <span>Клиенты</span>
@@ -772,6 +776,24 @@
             </div>
             
             <div id="certsList"></div>
+        </section>
+        
+        <!-- PROMOS TAB -->
+        <section id="promosTab" class="section">
+            <div class="card" style="background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(245,158,11,0.1)); margin-bottom: 16px;">
+                <div style="text-align: center; margin-bottom: 12px;">
+                    <span style="font-size: 32px;">🔥</span>
+                    <div style="font-weight: 600; margin-top: 8px;">Управление акциями</div>
+                    <div style="color: var(--text-secondary); font-size: 13px;">Добавляйте акции и новости</div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" style="flex: 1;" onclick="showAddPromoModal('promo')">🔥 Добавить акцию</button>
+                    <button class="btn btn-secondary" style="flex: 1;" onclick="showAddPromoModal('news')">📰 Новость</button>
+                </div>
+            </div>
+            
+            <div class="section-title">📋 Активные акции и новости</div>
+            <div id="promosList"></div>
         </section>
         
         <!-- CLIENTS TAB -->
@@ -858,6 +880,7 @@
         let scheduleData = {};
         let clientsData = [];
         let certsData = [];
+        let promosData = [];
         let settings = {};
         let currentCertFilter = 'pending';
         
@@ -870,6 +893,7 @@
             loadCerts();
             loadClients();
             loadSettings();
+            loadPromos();
         });
         
         function updateTodayDate() {
@@ -1573,6 +1597,167 @@
         document.getElementById('modal').addEventListener('click', (e) => {
             if (e.target.id === 'modal') closeModal();
         });
+        
+        // ============== PROMOTIONS ==============
+        async function loadPromos() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/promotions`);
+                const data = await response.json();
+                promosData = data.promotions || [];
+                renderPromos();
+            } catch (error) {
+                console.error('Failed to load promos:', error);
+                // Fallback: load from public API
+                try {
+                    const response = await fetch(`${API_URL}/api/promotions`);
+                    const data = await response.json();
+                    promosData = data.promotions || [];
+                    renderPromos();
+                } catch (e) {
+                    console.error('Failed to load promos from public API:', e);
+                }
+            }
+        }
+        
+        function renderPromos() {
+            const container = document.getElementById('promosList');
+            
+            if (!promosData || promosData.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div style="font-size: 48px; margin-bottom: 16px;">📢</div>
+                        <div style="color: var(--text-secondary);">Нет акций и новостей</div>
+                        <div style="color: var(--text-secondary); font-size: 13px;">Добавьте первую акцию</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = promosData.map(p => {
+                const isPromo = p.promo_type === 'promo';
+                const icon = isPromo ? '🔥' : '📰';
+                const bgColor = isPromo 
+                    ? 'linear-gradient(135deg, rgba(239,68,68,0.1), rgba(245,158,11,0.05))'
+                    : 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.05))';
+                const borderColor = isPromo ? 'rgba(239,68,68,0.2)' : 'rgba(59,130,246,0.2)';
+                const statusBadge = p.is_active 
+                    ? '<span style="color: var(--accent-green); font-size: 11px;">● Активна</span>'
+                    : '<span style="color: var(--text-secondary); font-size: 11px;">● Скрыта</span>';
+                
+                return `
+                    <div class="card" style="background: ${bgColor}; border: 1px solid ${borderColor}; margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                                    <span style="font-size: 18px;">${icon}</span>
+                                    <span style="font-weight: 600;">${p.title}</span>
+                                    ${statusBadge}
+                                </div>
+                                ${p.description ? `<div style="color: var(--text-secondary); font-size: 13px; line-height: 1.4;">${p.description}</div>` : ''}
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-small" style="background: ${p.is_active ? 'var(--accent-orange)' : 'var(--accent-green)'};" onclick="togglePromo(${p.id})">
+                                    ${p.is_active ? '👁 Скрыть' : '✅ Показать'}
+                                </button>
+                                <button class="btn btn-small btn-danger" onclick="deletePromo(${p.id})">🗑</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function showAddPromoModal(type) {
+            const isPromo = type === 'promo';
+            const title = isPromo ? '🔥 Новая акция' : '📰 Новая новость';
+            
+            document.getElementById('modalContent').innerHTML = `
+                <div style="padding: 20px;">
+                    <h3 style="text-align: center; margin-bottom: 20px;">${title}</h3>
+                    
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 13px;">Заголовок *</label>
+                        <input type="text" id="promoTitle" class="input" placeholder="${isPromo ? 'Скидка 20% на флоатинг' : 'Новая капсула DREAMPOD'}" style="width: 100%;">
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 13px;">Описание (необязательно)</label>
+                        <textarea id="promoDesc" class="input" rows="3" placeholder="Подробное описание..." style="width: 100%; resize: none;"></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal()">Отмена</button>
+                        <button class="btn btn-primary" style="flex: 1;" onclick="createPromo('${type}')">Создать</button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modal').classList.add('active');
+            document.getElementById('promoTitle').focus();
+        }
+        
+        async function createPromo(type) {
+            const title = document.getElementById('promoTitle').value.trim();
+            const description = document.getElementById('promoDesc').value.trim();
+            
+            if (!title) {
+                showToast('Введите заголовок', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/admin/promotions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description, promo_type: type })
+                });
+                
+                if (response.ok) {
+                    showToast('✅ ' + (type === 'promo' ? 'Акция' : 'Новость') + ' добавлена');
+                    closeModal();
+                    loadPromos();
+                } else {
+                    showToast('Ошибка создания', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to create promo:', error);
+                showToast('Ошибка сети', 'error');
+            }
+        }
+        
+        async function togglePromo(id) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/promotions/${id}/toggle`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    showToast('✅ Статус изменён');
+                    loadPromos();
+                }
+            } catch (error) {
+                console.error('Failed to toggle promo:', error);
+                showToast('Ошибка', 'error');
+            }
+        }
+        
+        async function deletePromo(id) {
+            if (!confirm('Удалить эту акцию/новость?')) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/api/admin/promotions/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showToast('🗑 Удалено');
+                    loadPromos();
+                }
+            } catch (error) {
+                console.error('Failed to delete promo:', error);
+                showToast('Ошибка', 'error');
+            }
+        }
     </script>
 </body>
 </html>
