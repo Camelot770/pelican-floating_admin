@@ -2,8 +2,11 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Пеликан — Админ</title>
+    <title>Пеликан — Админ v2.1</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -1314,15 +1317,36 @@
             console.log('🔄 markCertPaid called for:', certId);
             showToast('⏳ Подтверждаем оплату...', 'info');
             
+            const url = `${API_URL}/api/admin/certificates/${certId}/paid`;
+            console.log('🌐 Requesting URL:', url);
+            
             try {
-                const response = await fetch(`${API_URL}/api/admin/certificates/${certId}/paid`, {
+                const response = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    mode: 'cors'
                 });
                 
                 console.log('📥 Response status:', response.status);
-                const result = await response.json();
-                console.log('📥 Response data:', JSON.stringify(result, null, 2));
+                const text = await response.text();
+                console.log('📥 Response text:', text);
+                
+                let result;
+                try {
+                    result = JSON.parse(text);
+                } catch (e) {
+                    showModal(`
+                        <div class="modal-title">❌ Ошибка парсинга</div>
+                        <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
+                            Status: ${response.status}<br>
+                            Response: ${text.substring(0, 200)}
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn btn-primary" onclick="closeModal()">OK</button>
+                        </div>
+                    `);
+                    return;
+                }
                 
                 if (response.ok && result) {
                     if (result.redeem_code) {
@@ -1384,7 +1408,8 @@
                 showModal(`
                     <div class="modal-title">❌ Ошибка сети</div>
                     <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
-                        ${e.message}
+                        <b>${e.name}:</b> ${e.message}<br><br>
+                        URL: ${API_URL}/api/admin/certificates/${certId}/paid
                     </div>
                     <div class="modal-actions">
                         <button class="btn btn-primary" onclick="closeModal()">OK</button>
