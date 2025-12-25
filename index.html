@@ -6,7 +6,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Пеликан — Админ v2.1</title>
+    <title>Пеликан — Админ v2.2</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -1317,73 +1317,65 @@
             console.log('🔄 markCertPaid called for:', certId);
             showToast('⏳ Подтверждаем оплату...', 'info');
             
-            const url = `${API_URL}/api/admin/certificates/${certId}/paid`;
+            const url = `${API_URL}/api/admin/certificates/${certId}/paid?t=${Date.now()}`;
             console.log('🌐 Requesting URL:', url);
             
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    mode: 'cors'
-                });
+            // Используем XMLHttpRequest - лучше работает в Telegram WebView
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.timeout = 30000;
+            
+            xhr.onload = function() {
+                console.log('📥 Response status:', xhr.status);
+                console.log('📥 Response text:', xhr.responseText);
                 
-                console.log('📥 Response status:', response.status);
-                const text = await response.text();
-                console.log('📥 Response text:', text);
-                
-                let result;
-                try {
-                    result = JSON.parse(text);
-                } catch (e) {
-                    showModal(`
-                        <div class="modal-title">❌ Ошибка парсинга</div>
-                        <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
-                            Status: ${response.status}<br>
-                            Response: ${text.substring(0, 200)}
-                        </div>
-                        <div class="modal-actions">
-                            <button class="btn btn-primary" onclick="closeModal()">OK</button>
-                        </div>
-                    `);
-                    return;
-                }
-                
-                if (response.ok && result) {
-                    if (result.redeem_code) {
-                        const telegramStatus = result.telegram_sent 
-                            ? '✅ Сообщение отправлено покупателю' 
-                            : `⚠️ Сообщение не отправлено: ${result.telegram_error || 'неизвестная ошибка'}`;
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const result = JSON.parse(xhr.responseText);
                         
-                        showModal(`
-                            <div class="modal-title">✅ Сертификат оплачен!</div>
-                            <div style="text-align: center; margin: 20px 0;">
-                                <div style="background: rgba(0,255,136,0.1); border-radius: 16px; padding: 20px; margin: 16px 0;">
-                                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">КОД АКТИВАЦИИ</div>
-                                    <div style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: var(--accent-green); font-family: monospace;">
-                                        ${result.redeem_code}
+                        if (result.redeem_code) {
+                            const telegramStatus = result.telegram_sent 
+                                ? '✅ Сообщение отправлено покупателю' 
+                                : `⚠️ Сообщение не отправлено: ${result.telegram_error || 'неизвестная ошибка'}`;
+                            
+                            showModal(`
+                                <div class="modal-title">✅ Сертификат оплачен!</div>
+                                <div style="text-align: center; margin: 20px 0;">
+                                    <div style="background: rgba(0,255,136,0.1); border-radius: 16px; padding: 20px; margin: 16px 0;">
+                                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">КОД АКТИВАЦИИ</div>
+                                        <div style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: var(--accent-green); font-family: monospace;">
+                                            ${result.redeem_code}
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 13px; color: var(--text-secondary);">
+                                        ${result.cert_name || ''} · ${(result.price || 0).toLocaleString()} ₽
+                                    </div>
+                                    <div style="font-size: 12px; margin-top: 12px; padding: 8px; border-radius: 8px; background: ${result.telegram_sent ? 'rgba(0,255,136,0.1)' : 'rgba(255,100,100,0.1)'};">
+                                        ${telegramStatus}
                                     </div>
                                 </div>
-                                <div style="font-size: 13px; color: var(--text-secondary);">
-                                    ${result.cert_name || ''} · ${(result.price || 0).toLocaleString()} ₽
+                                <div class="modal-actions">
+                                    <button class="btn btn-primary" onclick="closeModal()">Готово</button>
                                 </div>
-                                <div style="font-size: 12px; margin-top: 12px; padding: 8px; border-radius: 8px; background: ${result.telegram_sent ? 'rgba(0,255,136,0.1)' : 'rgba(255,100,100,0.1)'};">
-                                    ${telegramStatus}
+                            `);
+                            showToast('✅ Код: ' + result.redeem_code, 'success');
+                        } else {
+                            showModal(`
+                                <div class="modal-title">⚠️ Ответ без кода</div>
+                                <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
+                                    ${JSON.stringify(result)}
                                 </div>
-                            </div>
-                            <div class="modal-actions">
-                                <button class="btn btn-primary" onclick="closeModal()">Готово</button>
-                            </div>
-                        `);
-                        showToast('✅ Код: ' + result.redeem_code, 'success');
-                    } else {
-                        console.error('❌ No redeem_code in response:', result);
+                                <div class="modal-actions">
+                                    <button class="btn btn-primary" onclick="closeModal()">OK</button>
+                                </div>
+                            `);
+                        }
+                    } catch (e) {
                         showModal(`
-                            <div class="modal-title">⚠️ Внимание</div>
-                            <div style="text-align: center; margin: 20px 0;">
-                                <div style="color: var(--text-secondary);">
-                                    Сертификат обработан, но код не получен.<br>
-                                    Ответ сервера: ${JSON.stringify(result)}
-                                </div>
+                            <div class="modal-title">❌ Ошибка парсинга</div>
+                            <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
+                                ${xhr.responseText.substring(0, 200)}
                             </div>
                             <div class="modal-actions">
                                 <button class="btn btn-primary" onclick="closeModal()">OK</button>
@@ -1391,34 +1383,48 @@
                         `);
                     }
                 } else {
-                    const errorMsg = result?.detail || result?.error || JSON.stringify(result);
-                    console.error('❌ Error response:', errorMsg);
                     showModal(`
-                        <div class="modal-title">❌ Ошибка</div>
+                        <div class="modal-title">❌ Ошибка ${xhr.status}</div>
                         <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
-                            ${errorMsg}
+                            ${xhr.responseText || 'Нет ответа от сервера'}
                         </div>
                         <div class="modal-actions">
                             <button class="btn btn-primary" onclick="closeModal()">OK</button>
                         </div>
                     `);
                 }
-            } catch (e) {
-                console.error('❌ Exception:', e);
+                
+                loadCerts();
+                loadStats();
+            };
+            
+            xhr.onerror = function() {
+                console.error('❌ XHR Error');
                 showModal(`
                     <div class="modal-title">❌ Ошибка сети</div>
                     <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
-                        <b>${e.name}:</b> ${e.message}<br><br>
-                        URL: ${API_URL}/api/admin/certificates/${certId}/paid
+                        Не удалось подключиться к серверу
                     </div>
                     <div class="modal-actions">
                         <button class="btn btn-primary" onclick="closeModal()">OK</button>
                     </div>
                 `);
-            }
+            };
             
-            loadCerts();
-            loadStats();
+            xhr.ontimeout = function() {
+                console.error('❌ XHR Timeout');
+                showModal(`
+                    <div class="modal-title">❌ Таймаут</div>
+                    <div style="text-align: center; margin: 20px 0; color: var(--text-secondary);">
+                        Сервер не ответил за 30 секунд
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-primary" onclick="closeModal()">OK</button>
+                    </div>
+                `);
+            };
+            
+            xhr.send();
         }
         
         async function checkCertCode() {
