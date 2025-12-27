@@ -118,15 +118,20 @@
         .header {
             background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(168,85,247,0.1));
             padding: 20px;
-            text-align: center;
             border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-content {
+            text-align: left;
         }
         
         .header h1 {
             font-size: 20px;
             display: flex;
             align-items: center;
-            justify-content: center;
             gap: 8px;
         }
         
@@ -134,6 +139,37 @@
             color: var(--text-secondary);
             font-size: 13px;
             margin-top: 4px;
+        }
+        
+        .refresh-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: var(--bg-card);
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease, background 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .refresh-btn:active {
+            transform: scale(0.95);
+        }
+
+        .refresh-btn.spinning {
+            animation: spin 0.8s ease-in-out;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
         
         /* Stats Row */
@@ -854,8 +890,11 @@
 </head>
 <body>
     <div class="header">
-        <h1>🦩 Пеликан <span style="color: var(--accent-purple)">Админ</span></h1>
-        <div class="subtitle" id="todayDate">Загрузка...</div>
+        <div class="header-content">
+            <h1>🦩 Пеликан <span style="color: var(--accent-purple)">Админ</span></h1>
+            <div class="subtitle" id="todayDate">Загрузка...</div>
+        </div>
+        <button class="refresh-btn" onclick="refreshApp()" title="Обновить">🔄</button>
     </div>
     
     <div class="stats-row">
@@ -2204,6 +2243,23 @@
         
         function closeModal() {
             document.getElementById('modal').classList.remove('active');
+        }
+        
+        // Refresh app
+        function refreshApp() {
+            const btn = document.querySelector('.refresh-btn');
+            btn.classList.add('spinning');
+            
+            // Перезагружаем все данные
+            loadStats();
+            loadBookings();
+            loadServices();
+            
+            // Показываем уведомление
+            setTimeout(() => {
+                btn.classList.remove('spinning');
+                showToast('Данные обновлены');
+            }, 800);
         }
         
         function showToast(message, type = 'success') {
