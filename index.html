@@ -2249,17 +2249,9 @@
         function refreshApp() {
             const btn = document.querySelector('.refresh-btn');
             btn.classList.add('spinning');
-            
-            // Перезагружаем все данные
-            loadStats();
-            loadBookings();
-            loadServices();
-            
-            // Показываем уведомление
             setTimeout(() => {
-                btn.classList.remove('spinning');
-                showToast('Данные обновлены');
-            }, 800);
+                window.location.reload();
+            }, 300);
         }
         
         function showToast(message, type = 'success') {
