@@ -1,13 +1,6 @@
 {
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
-      ]
-    }
-  ],
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "https://pelican-floating-camelot770.amvera.io/api/:path*" }
+  "version": 2,
+  "routes": [
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
